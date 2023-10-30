@@ -34,7 +34,11 @@ from sklearn.model_selection import train_test_split
 
 # You can also define custom functions, classes, and other code in this module.
 
-def load_data(data_path, row_info_path, column_info_path):
+import pandas as pd
+import numpy as np
+from scipy.sparse import coo_matrix
+
+def load_data(data_path, row_info_path, column_info_path, transpose=False):
     # Load non_zero parquet data
     table = read_table(data_path)
     nonzero_data = table.to_pandas()
@@ -54,15 +58,16 @@ def load_data(data_path, row_info_path, column_info_path):
         (nonzero_data['nonzero_elements'], (nonzero_data['row_indices'], nonzero_data['col_indices'])),
         shape=(len(row_names), len(column_names))
     )
-    
-    
-   
+    if transpose:
+        transposed_matrix = sparse_matrix.transpose()
+        row_indices = np.arange(transposed_matrix.shape[0])
+        print('Returning Transposed matrix, row_names of the transposed matrix, col_names of the transposed matrix, and row_indices of transposed matrix')
+        return transposed_matrix, column_names, row_names, row_indices
+    else:
+        row_indices = np.arange(sparse_matrix.shape[0])
+        print('Returning sparse_matrix, column_names, row_names, and row_indices')
+        return sparse_matrix, column_names, row_names, row_indices
 
-    print('Returning sparse_matrix, column_names, row_names, and row_indices')
-    
-    row_indices = np.arange(sparse_matrix.shape[0])
-    
-    return sparse_matrix, column_names, row_names, row_indices
 
 
 class SparseTrainTestSplit(BaseEstimator, TransformerMixin):
@@ -223,13 +228,19 @@ class DataEDAPCA:
         self.updated_df = X
         self.outlier_df_cleaned = outlier_df
 
-    def fit_transform(self, X, another_df=None):
+    def fit_transform(self, X, another_df=None, trans = None):
         # Step 1: Display the initial boxplot and scatterplot
         print('Box Plot and Scatterplot of Data Set with Outliers')
         self.plot_box_and_scatter(X)
 
         # Step 2: Notify rows with high Z-scores and remove them
         self.remove_outliers(X)
+        print('Sending updated Df to Output')
+        ## Sending updated df to Output
+        if trans == None:
+            X.to_csv('../Output/pca_train_df_without_outliers.csv')
+        else:
+            X.to_csv(f'../Output/pca_train_df_without_outliers_{trans}.csv')
        
 
         # Step 3: If another_df is provided, subset it using the same indices
