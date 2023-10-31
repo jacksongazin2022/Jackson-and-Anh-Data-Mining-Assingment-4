@@ -94,7 +94,7 @@ class SparseTrainTestSplit(BaseEstimator, TransformerMixin):
         return sparse_train, sparse_test, train_indices, test_indices
 
 class DataClean:
-    def __init__(self, trans = False, remove_by_column=True):
+    def __init__(self, trans=False, remove_by_column=True):
         self.remove_by_column = remove_by_column
         self.output_folder = "../output"
         self.trans = trans
@@ -106,10 +106,10 @@ class DataClean:
     def fit(self, X, y=None):
         # Check if there are NaN values in the data
         self.has_nan_values = np.isnan(X.data).any()
-        if self.trans == False:
+        if not self.trans:
             file_name = "na_info.txt"
         else:
-            file_name = f"na_info.txt_{trans}"
+            file_name = "na_info.txt_trans"
 
         with open(os.path.join(self.output_folder, file_name), "w") as f:
             if self.has_nan_values:
@@ -172,7 +172,9 @@ class Reindex:
         return self
     def save_to_csv(self, dataframe, filename):
         if self.trans:
-            filename = filename + "_trans"  # Add "_trans" to the filename if data is transposed
+            filename = filename + "_trans.csv"  # Add "_trans" to the filename if data is transposed
+        else:
+            filename = filename + ".csv"
         dataframe.to_csv(filename)
 
     def transform(self, X, indices, data_type):
@@ -180,7 +182,7 @@ class Reindex:
         df_with_indices = pd.DataFrame(X, columns=self.columns, index=row_names_indices)
         
         # Generate the output filename based on the data type (e.g., "train" or "test")
-        output_filename = f"../Output/pca_{data_type}_df.csv"
+        output_filename = f"../Output/pca_{data_type}_df"
         self.save_to_csv(df_with_indices, output_filename)
         
         return df_with_indices
@@ -209,9 +211,11 @@ class DataEDAPCA:
         plt.title(f"Scatterplot of {self.columns[0]} and {self.columns[1]}")
         plt.show()
     def save_to_csv(self, dataframe, filename):
-        if self.trans == True:
-            filename = filename + "_trans"  # Add "_trans" to the filename if data is transposed
-        dataframe.to_csv(filename)
+        if self.trans:
+            filename = filename + "_trans.csv"  # Add "_trans" to the filename if data is transposed
+        else:
+            filename = filename + ".csv"
+        dataframe.to_csv(filename)  # Add "_trans" to the filename if data is transposed
     def remove_outliers(self, X):
         # Calculate Z-scores for the specified columns
         z_scores = stats.zscore(X[self.columns])
@@ -220,7 +224,7 @@ class DataEDAPCA:
         z_scores_df = pd.DataFrame(z_scores, columns=self.columns, index=X.index)
 
         print("DataFrame of Z-scores sent to output folder")
-        self.save_to_csv(z_scores_df, '../Output/z_scores.csv')
+        self.save_to_csv(z_scores_df, '../Output/z_scores')
         print("Z-threshold:", self.z_threshold)
         # Find rows where the value of any column is greater than the absolute value of the threshold
         outlier_mask = (np.abs(z_scores_df) > self.z_threshold).any(axis=1)
@@ -231,7 +235,7 @@ class DataEDAPCA:
         
         total_rows = outlier_df.shape[0]
         print("Df of Outliers sent to output folder")
-        self.save_to_csv(self.outlier_df_cleaned, '../Output/outlier_indices.csv')
+        self.save_to_csv(self.outlier_df_cleaned, '../Output/outlier_indices')
         
             
 
@@ -249,7 +253,7 @@ class DataEDAPCA:
         self.remove_outliers(X)
         print('Sending updated Df to Output')
         ## Sending updated df to Output
-        self.save_to_csv(X,'../Output/pca_train_df_without_outliers.csv')
+        self.save_to_csv(X,'../Output/pca_train_df_without_outliers')
        
 
         # Step 3: If another_df is provided, subset it using the same indices
@@ -389,10 +393,12 @@ class OptimizeAndCompareKMeans(BaseEstimator, TransformerMixin):
 
     def transform(self, X, y=None):
         return self.best_estimator
-def save_to_csv(dataframe, filename, trans):
-    if trans == True:
-        filename = filename + "_trans"  # Add "_trans" to the filename if data is transposed
-    dataframe.to_csv(filename)
+    def save_to_csv(self, dataframe, filename):
+        if self.trans:
+            filename = filename + "_trans.csv"  # Add "_trans" to the filename if data is transposed
+        else:
+            filename = filename + ".csv"
+        dataframe.to_csv(filename)
 def create_labels_and_scoring_df(estimator, output_file_location, pca_train_df, pca_test_df, trans = False):
     # Extract cluster labels for training and test data
     train_cluster_labels = estimator.labels_
