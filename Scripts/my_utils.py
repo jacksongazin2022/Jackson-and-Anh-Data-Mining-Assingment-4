@@ -30,6 +30,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.cluster import KMeans
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import adjusted_rand_score
+from sklearn.metrics import make_scorer
 
 
 # You can also define custom functions, classes, and other code in this module.
@@ -259,46 +260,61 @@ class DataEDAPCA:
         return self.updated_df, removed_metadata, self.outlier_df_cleaned
 
 
+
 class OptimizeAndCompareKMeans(BaseEstimator, TransformerMixin):
-    def __init__(self, kmeans_params, alpha=0.05):
+    def __init__(self, kmeans_params, alpha=0.05, random_state=42):
         self.kmeans_params = kmeans_params
         self.alpha = alpha
         self.grid_search_scores = {}  # Store the silhouette scores for grid search
         self.default_estimator_scores = {}  # Store information for the default estimator
-        self.choice = None
-
+        self.choice = "Default KMeans Estimator"
+        self.random_state = random_state
+    def silhouette_scorer(self, estimator, X):  # Define it as an instance method
+        labels = estimator.fit_predict(X)
+        if len(set(labels)) == 1:
+            return 0  # Silhouette score is undefined for a single cluster
+        return silhouette_score(X, labels)
+    
     def fit(self, X, y=None):
         # Perform Grid Search
-        grid = GridSearchCV(KMeans(), self.kmeans_params, cv=3, refit=True)
+        grid = GridSearchCV(KMeans(random_state=self.random_state), self.kmeans_params, cv=3, scoring=self.silhouette_scorer, refit=True)
         grid.fit(X)
+
+        # Save best estimator
         grid_search_estimator = grid.best_estimator_
 
-        # Calculate silhouette scores for grid search
-        grid_search_scores = {}  # Store the silhouette scores for grid search
-        for params, score in zip(grid.cv_results_['params'], grid.cv_results_['mean_test_score']):
-            grid_search_scores[str(params)] = score
-        self.grid_search_scores = grid_search_scores
+        # Store the results of grid search
+        self.grid_search_scores = grid.cv_results_
+        grid_search_silhouette_score = silhouette_score(X, grid_search_estimator.labels_)
 
-        # Calculate silhouette scores for the default estimator
+        # Fit the default Kmeans
         default_kmeans = KMeans(n_clusters=2, random_state=0, n_init="auto").fit(X)
-        default_silhouette_score = silhouette_score(X, default_kmeans.labels_)
-        self.default_estimator_scores['parameters'] = default_kmeans.get_params()
-        self.default_estimator_scores['silhouette_score'] = default_silhouette_score
 
-        # Perform a two-sample t-test only if Grid Search performs better
-        if grid_search_estimator > default_silhouette_score:
+        # Store the results
+        self.default_estimator_scores['parameters'] = default_kmeans.get_params()
+        self.default_estimator_scores['silhouette_score'] = silhouette_score(X, default_kmeans.labels_)
+
+        # Compare silhouette scores and choose the best estimator
+        if grid_search_silhouette_score > self.default_estimator_scores['silhouette_score']:
             t_stat, p_value = stats.ttest_ind(default_kmeans.labels_, grid_search_estimator.labels_)
 
             # Set the default choice to "Grid Search Estimator"
-            self.choice = "KMeans Estimator"
 
-            # Output informative print statements (if needed)
+            # Output informative print statements
+            print("Default KMeans Silhouette Score:", self.default_estimator_scores['silhouette_score'])
+            print("Grid Search Estimator Silhouette Score:", grid_search_silhouette_score)
             if p_value < self.alpha:
                 self.choice = "Grid Search Estimator"
+                print("The difference between the two groups is statistically significant.")
+                print(f"Using {self.choice} as it performs significantly better using a threshold of alpha = .05 .")
             else:
-                self.choice = "Default Parameter"
+                print("The difference between the two groups is not statistically significant.")
+                print(f"Using {self.choice} as there is no significant improvement using a threshold of alpha = .05.")
         else:
-            self.choice = "Default Parameter"
+            print("Grid Search Estimator Silhouette Score:", grid_search_silhouette_score)
+            print("Default KMeans Silhouette Score:", self.default_estimator_scores['silhouette_score'])
+            print("Default Parameter has a higher Silhouette Score.")
+            print("Using Default Parameter as it performs better based on Silhouette Score.")
 
         self.best_estimator = grid_search_estimator if self.choice == "Grid Search Estimator" else default_kmeans
         return self
