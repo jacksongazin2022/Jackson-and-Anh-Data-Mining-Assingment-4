@@ -31,6 +31,7 @@ from sklearn.cluster import KMeans
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import adjusted_rand_score
 from sklearn.metrics import make_scorer
+from sklearn.metrics import silhouette_samples
 
 
 # You can also define custom functions, classes, and other code in this module.
@@ -184,16 +185,19 @@ class Reindex:
         
         return df_with_indices
 class DataEDAPCA:
-    def __init__(self, columns, trans, z_threshold=10):
+    def __init__(self, columns, trans = False, z_threshold=10, graphs = False):
         self.columns = columns
         self.z_threshold = z_threshold
         self.removed_indices = None
         self.updated_df = None
         self.outlier_df_cleaned = None
         self.trans = trans
+        self.graphs = graphs
 
     def plot_box_and_scatter(self, X):
         # Create a boxplot of the specified columns
+        if not self.graphs:
+            return
         X[self.columns].boxplot()
         plt.title(f"Boxplot of {self.columns[0]} and {self.columns[1]}")
         plt.show()
@@ -205,7 +209,7 @@ class DataEDAPCA:
         plt.title(f"Scatterplot of {self.columns[0]} and {self.columns[1]}")
         plt.show()
     def save_to_csv(self, dataframe, filename):
-        if self.trans:
+        if self.trans == True:
             filename = filename + "_trans"  # Add "_trans" to the filename if data is transposed
         dataframe.to_csv(filename)
     def remove_outliers(self, X):
@@ -260,6 +264,70 @@ class DataEDAPCA:
         return self.updated_df, removed_metadata, self.outlier_df_cleaned
 
 
+
+class Optimize_and_Compare_Hdbscan(BaseEstimator, TransformerMixin):
+    def __init__(self, hdbscan_params, alpha=0.05, random_state=42):
+        self.hdbscan_params = hdbscan_params
+        self.alpha = alpha
+        self.grid_search_scores = {}  # Store the silhouette scores for grid search
+        self.default_estimator_scores = {}  # Store information for the default estimator
+        self.choice = "Default Hdbscan Estimator"
+        self.random_state = random_state
+    def silhouette_scorer(self, estimator, X):  # Define it as an instance method
+        labels = estimator.fit_predict(X)
+        if len(set(labels)) == 1:
+            return 0  # Silhouette score is undefined for a single cluster
+        return silhouette_score(X, labels)
+    
+    def fit(self, X, y=None):
+        # Perform Grid Search
+        grid = GridSearchCV(HDBSCAN(min_cluster_size=20), self.hdbscan_params, cv=3, scoring=self.silhouette_scorer, refit=True)
+        grid.fit(X)
+
+        # Save best estimator
+        grid_search_estimator = grid.best_estimator_
+
+        # Store the results of grid search
+        self.grid_search_scores = grid.cv_results_
+        grid_search_silhouette_score = silhouette_score(X, grid_search_estimator.labels_)
+
+        # Fit the default Kmeans
+        default_hdbscan = HDBSCAN(min_cluster_size=20).fit(X)
+        
+
+        # Store the results
+        self.default_estimator_scores['parameters'] = default_hdbscan.get_params()
+        self.default_estimator_scores['silhouette_score'] = silhouette_score(X, default_hdbscan.labels_)
+
+        # Compare silhouette scores and choose the best estimator
+        if grid_search_silhouette_score > self.default_estimator_scores['silhouette_score']:
+            t_stat, p_value = stats.ttest_ind(default_hdbscan.labels_, grid_search_estimator.labels_)
+
+            # Set the default choice to "Grid Search Estimator"
+
+            # Output informative print statements
+            print("Default Hdbscan Silhouette Score:", self.default_estimator_scores['silhouette_score'])
+            print("Grid Search Estimator Silhouette Score:", grid_search_silhouette_score)
+            if p_value < self.alpha:
+                self.choice = "Grid Search Estimator"
+                print("The difference between the two groups is statistically significant.")
+                print(f"Using {self.choice} as it performs significantly better using a threshold of alpha = .05 .")
+            else:
+                print("The difference between the two groups is not statistically significant.")
+                print(f"Using {self.choice} as there is no significant improvement using a threshold of alpha = .05.")
+        else:
+            print("Grid Search Estimator Silhouette Score:", grid_search_silhouette_score)
+            print("Default KMeans Silhouette Score:", self.default_estimator_scores['silhouette_score'])
+            print("Default Parameter has a higher Silhouette Score.")
+            print("Using Default Parameter as it performs better based on Silhouette Score.")
+
+        self.best_estimator = grid_search_estimator if self.choice == "Grid Search Estimator" else default_hdbscan
+        
+        
+        return self
+
+    def transform(self, X, y=None):
+        return self.best_estimator
 
 class OptimizeAndCompareKMeans(BaseEstimator, TransformerMixin):
     def __init__(self, kmeans_params, alpha=0.05, random_state=42):
@@ -321,5 +389,42 @@ class OptimizeAndCompareKMeans(BaseEstimator, TransformerMixin):
 
     def transform(self, X, y=None):
         return self.best_estimator
+def save_to_csv(dataframe, filename, trans):
+    if trans == True:
+        filename = filename + "_trans"  # Add "_trans" to the filename if data is transposed
+    dataframe.to_csv(filename)
+def create_labels_and_scoring_df(estimator, output_file_location, pca_train_df, pca_test_df, trans = False):
+    # Extract cluster labels for training and test data
+    train_cluster_labels = estimator.labels_
+    test_cluster_labels = estimator.predict(pca_test_df)
+
+    # Calculate silhouette scores for training and test data points
+    silhouette_train_samples = silhouette_samples(pca_train_df, train_cluster_labels)
+    silhouette_test_samples = silhouette_samples(pca_test_df, test_cluster_labels)
+
+    # Create DataFrames for training and test data
+    train_df = pd.DataFrame({
+        'Index': pca_train_df.index,
+        'Data_Type': 'Train',
+        'Cluster_Label': train_cluster_labels,
+        'Silhouette_Score': silhouette_train_samples
+    })
+
+    test_df = pd.DataFrame({
+        'Index': pca_test_df.index,
+        'Data_Type': 'Test',
+        'Cluster_Label': test_cluster_labels,
+        'Silhouette_Score': silhouette_test_samples
+    })
+
+    # Concatenate the DataFrames for training and test data
+    result_df = pd.concat([train_df, test_df])
+    
+    print(f'Sending Result file to {output_file_location}')
+
+    # Save the concatenated DataFrame to a single CSV file
+    save_to_csv(result_df, output_file_location, trans)
+
+    return result_df
 
 
