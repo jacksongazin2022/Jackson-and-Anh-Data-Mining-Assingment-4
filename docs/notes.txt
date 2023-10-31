@@ -1,0 +1,21 @@
+++ Task 1 and 2
++ too large of row number: cluster by batch, or incremental clustering
++ set up a validation
+
+++ Task 2
++ balance on gender and disease for train/test
++ count number in cluster
+
+++ Cluster profiling
++ differentail analysis
++ is there a different columns 
++ chi-squared test
+
+++ Task 3
++ run time analysis for change in N, M, and both N and M
+
+
++ demographics of cells and gene
++ are there cells of different patients, or dominiated by one person
++ save graphics to pdf
++ generate table
