@@ -546,4 +546,4 @@ class PreserveRowIndicesSplitter(BaseEstimator, TransformerMixin):
         train_coo_matrix = coo_matrix(train_csr_matrix)
         test_coo_matrix = coo_matrix(test_csr_matrix)
 
-        return train_coo_matrix, test_coo_matrix, train_row_indices, test_row_indices
+        return train_coo_matrix, test_coo_matrix, train_row_indices_subset, test_row_indices
