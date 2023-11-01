@@ -215,7 +215,7 @@ class DataEDAPCA:
         plt.xlabel(self.columns[0])
         plt.ylabel(self.columns[1])
         plt.title(f"Scatterplot of {self.columns[0]} and {self.columns[1]}")
-        if trans == False:
+        if self.trans == False:
             plt.savefig(f'../Output/{name}.pdf')
         else:
             plt.savefig(f'../Output/{name}_trans.pdf')
@@ -256,7 +256,7 @@ class DataEDAPCA:
     def fit_transform(self, X, another_df=None):
         # Step 1: Display the initial boxplot and scatterplot
         print('Box Plot and Scatterplot of Data Set with Outliers')
-        self.plot_box_and_scatter(X, 'PCA_with_Outliers', trans)
+        self.plot_box_and_scatter(X, 'PCA_with_Outliers')
 
         # Step 2: Notify rows with high Z-scores and remove them
         self.remove_outliers(X)
@@ -272,7 +272,7 @@ class DataEDAPCA:
 
         # Step 4: Display the boxplot and scatterplot of the updated data
         print('Box Plot and Scatterplot of Data Set without Outliers')
-        self.plot_box_and_scatter(X, 'PCA_without_Outliers', trans)
+        self.plot_box_and_scatter(X, 'PCA_without_Outliers')
         print('Returning updated dataframe, metadata of rows we removed, and PC of rows we removed')
         return self.updated_df, removed_metadata, self.outlier_df_cleaned
 
