@@ -32,6 +32,12 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import adjusted_rand_score
 from sklearn.metrics import make_scorer
 from sklearn.metrics import silhouette_samples
+from scipy.sparse import coo_matrix, csr_matrix
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+import numpy as np
+import pandas as pd
 
 
 # You can also define custom functions, classes, and other code in this module.
@@ -434,3 +440,110 @@ def create_labels_and_scoring_df(estimator, output_file_location, pca_train_df, 
     return result_df
 
 
+def get_training_meta_data(row_names_list, train_indices, metadata):
+    # Create a DataFrame from the row_names_list with the 'name' column
+    row_names_df = pd.DataFrame(row_names_list, columns=['name'])
+
+    # Subset the row_names_df using the train_indices
+    subset_row_names_df = row_names_df.loc[train_indices]
+
+    # Subset the metadata to include only rows with 'name' values from subset_row_names_df
+    subset_metadata = metadata[metadata['name'].isin(subset_row_names_df['name'])]
+
+    return subset_metadata
+
+# Example usage of the function
+def create_even_distribution_sample(input_df, groupby_cols):
+    group_counts = input_df.groupby(groupby_cols).size().reset_index(name='count')
+    min_count = group_counts['count'].min()
+    even_distribution_sample = pd.DataFrame(columns=input_df.columns)
+
+    for group_name, group_data in group_counts.groupby(groupby_cols):
+        group_size = group_data['count'].iloc[0]
+        sample_size = min(min_count, group_size)
+        
+        sampled_rows = input_df[
+            (input_df[groupby_cols[0]] == group_name[0]) & 
+            (input_df[groupby_cols[1]] == group_name[1])
+        ].sample(n=sample_size, random_state=42)
+        
+        even_distribution_sample = even_distribution_sample.append(sampled_rows)
+
+    even_distribution_sample = even_distribution_sample.reset_index(drop=True)
+    
+    return even_distribution_sample
+def create_balanced_metadata(input_metadata, row_names, train_indices, groupby_columns):
+    row_names_df = pd.DataFrame(row_names, columns=['name'])
+    subset_row_names_df = row_names_df.loc[train_indices]
+    print('Subsetting metadata')
+    subsetted_metadata = input_metadata[input_metadata['name'].isin(subset_row_names_df['name'])]
+    
+    group_counts = subsetted_metadata.groupby(groupby_columns).size().reset_index(name='count')
+    min_count = group_counts['count'].min()
+    
+    even_distribution_sample = pd.DataFrame(columns=input_metadata.columns)
+
+    for group_name, group_data in group_counts.groupby(groupby_columns):
+        group_size = group_data['count'].iloc[0]
+        sample_size = min(min_count, group_size)
+        
+        sampled_rows = subsetted_metadata[
+            (subsetted_metadata[groupby_columns[0]] == group_name[0]) & 
+            (subsetted_metadata[groupby_columns[1]] == group_name[1])
+        ].sample(n=sample_size, random_state=42)
+        
+        even_distribution_sample = even_distribution_sample.append(sampled_rows)
+
+    even_distribution_sample = even_distribution_sample.reset_index(drop=True)
+    print('Sending balanced sample to /Output/even_distribution_sample.csv')
+    even_distribution_sample.to_csv('../Output/even_distribution_sample.csv')
+    
+    balanced_name_list = even_distribution_sample['name'].to_list()
+    
+    df_of_balanced_indices = subset_row_names_df[subset_row_names_df['name'].isin(balanced_name_list)]
+    feature_subset_rows = df_of_balanced_indices.index.to_numpy()
+    
+    return feature_subset_rows
+
+class PreserveRowIndicesSplitter(BaseEstimator, TransformerMixin):
+    def __init__(self, test_size=0.2, random_state=42, feature_subset_rows=None, input_metadata=None, row_names=None, groupby_columns=None):
+        self.test_size = test_size
+        self.random_state = random_state
+        self.original_row_indices = None
+        self.csr_matrix = None
+        self.feature_subset_rows = feature_subset_rows
+        self.input_metadata = input_metadata
+        self.row_names = row_names
+        self.groupby_columns = groupby_columns
+
+    def fit(self, X, y=None):
+        if not isinstance(X, coo_matrix):
+            raise ValueError("Input matrix must be in COO format.")
+        self.csr_matrix = csr_matrix(X)
+        self.original_row_indices = np.arange(self.csr_matrix.shape[0])
+        return self
+
+    def transform(self, X):
+        if self.original_row_indices is None:
+            raise ValueError("You must fit the splitter first.")
+        
+        # Split the row indices into training and testing sets
+        train_row_indices, test_row_indices, _, _ = train_test_split(
+            self.original_row_indices, self.original_row_indices,
+            test_size=self.test_size, random_state=self.random_state
+        )
+        
+        # Calculate feature_subset_rows using create_balanced_metadata
+        self.feature_subset_rows = create_balanced_metadata(self.input_metadata, self.row_names, train_row_indices, self.groupby_columns)
+        print('Subsetting training data to be balanced data set')
+        train_row_indices_subset = np.intersect1d(train_row_indices, self.feature_subset_rows)
+        
+        # Extract rows using CSR slicing
+        train_csr_matrix = self.csr_matrix[train_row_indices_subset]
+        test_csr_matrix = self.csr_matrix[test_row_indices]
+
+        # Convert the results back to COO format
+        train_coo_matrix = coo_matrix(train_csr_matrix)
+        test_coo_matrix = coo_matrix(test_csr_matrix)
+
+        return train_coo_matrix, test_coo_matrix, train_row_indices, test_row_indices
