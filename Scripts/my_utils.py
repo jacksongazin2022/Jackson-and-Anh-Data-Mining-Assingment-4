@@ -38,6 +38,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
 import numpy as np
 import pandas as pd
+import time
+from sklearn.metrics import silhouette_score
 
 
 # You can also define custom functions, classes, and other code in this module.
@@ -550,3 +552,36 @@ class PreserveRowIndicesSplitter(BaseEstimator, TransformerMixin):
         test_coo_matrix = coo_matrix(test_csr_matrix)
 
         return train_coo_matrix, test_coo_matrix, train_row_indices_subset, test_row_indices
+import time
+from sklearn.metrics import silhouette_score
+def calculate_silhouette(pca_train_df, pca_test_df, pipe, kmeans = False):
+    # Start timing
+    start_time = time.time()
+    print('Fitting pipe to the training data')
+    results = pipe.fit(pca_train_df)
+    print('Saving best estimator')
+    best_estimator = results.named_steps['clusterer'].best_estimator
+
+    silhouette_test = None  # Initialize with None
+    silhoutte_train = None
+    if kmeans == True:
+        predictions_test = best_estimator.predict(pca_test_df)
+        silhouette_train = silhouette_score(pca_train_df, best_estimator.labels_)
+        # For test data
+        silhouette_test = silhouette_score(pca_test_df, best_estimator.predict(pca_test_df))
+    else:
+        try:
+            
+            # Calculate silhouette score for test data
+            silhouette_test = silhouette_score(pca_test_df, best_estimator.fit_predict(pca_test_df))
+            silhouette_train = silhouette_score(pca_train_df, best_estimator.labels_)
+            print(f'Silhouette Score on test data: {silhouette_test}')
+            print(f'Silhouette Score on training data: {silhouette_train}')
+        except ValueError as e:
+            print("Only one cluster for my test data set. HDBSCAN does not work well for this data set")
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+   
+    print(f'Time taken: {elapsed_time / 60:.2f} minutes')
+    print('Returning fitted pipe, best estimator, silohoutte score on training and testing')
+    return results, best_estimator, silhouette_train, silhouette_test
