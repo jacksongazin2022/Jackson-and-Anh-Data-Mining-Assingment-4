@@ -410,6 +410,12 @@ class OptimizeAndCompareKMeans(BaseEstimator, TransformerMixin):
         else:
             filename = filename + ".csv"
         dataframe.to_csv(filename)
+def save_to_csv(dataframe, filename, trans = False):
+        if trans:
+            filename = filename + "_trans.csv"  # Add "_trans" to the filename if data is transposed
+        else:
+            filename = filename + ".csv"
+        dataframe.to_csv(filename)
 def create_labels_and_scoring_df(estimator, output_file_location, pca_train_df, pca_test_df, trans = False):
     # Extract cluster labels for training and test data
     train_cluster_labels = estimator.labels_
@@ -569,6 +575,11 @@ def calculate_silhouette(pca_train_df, pca_test_df, pipe, kmeans = False):
         silhouette_train = silhouette_score(pca_train_df, best_estimator.labels_)
         # For test data
         silhouette_test = silhouette_score(pca_test_df, best_estimator.predict(pca_test_df))
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f'Time taken: {elapsed_time / 60:.2f} minutes')
+        print('Returning fitted pipe, best estimator, silohoutte score on training and testing')
+        return results, best_estimator, silhouette_train, silhouette_test
     else:
         try:
             
@@ -577,11 +588,15 @@ def calculate_silhouette(pca_train_df, pca_test_df, pipe, kmeans = False):
             silhouette_train = silhouette_score(pca_train_df, best_estimator.labels_)
             print(f'Silhouette Score on test data: {silhouette_test}')
             print(f'Silhouette Score on training data: {silhouette_train}')
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print(f'Time taken: {elapsed_time / 60:.2f} minutes')
+            print('Returning fitted pipe, best estimator, silohoutte score on training and testing')
+            return results, best_estimator, silhouette_train, silhouette_test
         except ValueError as e:
             print("Only one cluster for my test data set. HDBSCAN does not work well for this data set")
-    end_time = time.time()
-    elapsed_time = end_time - start_time
+            print('Returning fitted pipe and best estimator')
+            return results, best_estimator
+    
    
-    print(f'Time taken: {elapsed_time / 60:.2f} minutes')
-    print('Returning fitted pipe, best estimator, silohoutte score on training and testing')
-    return results, best_estimator, silhouette_train, silhouette_test
+   
