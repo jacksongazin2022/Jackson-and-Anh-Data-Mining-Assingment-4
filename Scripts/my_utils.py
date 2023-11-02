@@ -601,7 +601,7 @@ def calculate_silhouette(pca_train_df, pca_test_df, pipe, kmeans = False):
             if len(np.unique(best_estimator.fit_predict(pca_test_df))) == 1:
                 print('Estimator sends all test data points to the same data label. Cannot get sillhoute test score')
                 print('Returning results best estimator and silhouette_train score')
-                silhouette_train = silhouette_score(pca_train_df, best_estimator.fit_predict(pca_test_df))
+                silhouette_train = silhouette_score(pca_train_df, best_estimator.fit_predict(pca_train_df))
                 return results, best_estimator, silhouette_train
                 
             else:
