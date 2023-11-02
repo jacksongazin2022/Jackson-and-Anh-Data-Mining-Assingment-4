@@ -572,36 +572,48 @@ def calculate_silhouette(pca_train_df, pca_test_df, pipe, kmeans = False):
 
     silhouette_test = None  # Initialize with None
     silhoutte_train = None
-    if kmeans == True:
-        predictions_test = best_estimator.predict(pca_test_df)
-        silhouette_train = silhouette_score(pca_train_df, best_estimator.labels_)
-        # For test data
-        silhouette_test = silhouette_score(pca_test_df, best_estimator.predict(pca_test_df))
+    cluster_labels = best_estimator.labels_
+    num_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
+    print(f'{num_clusters} cluster')
+    if num_clusters <= 1:
+        print('Cannot compute silhoutte score for validation. There is only one cluster label.')
         end_time = time.time()
         elapsed_time = end_time - start_time
         print(f'Time taken: {elapsed_time / 60:.2f} minutes')
-        print('Returning fitted pipe, best estimator, silohoutte score on training and testing')
-        return results, best_estimator, silhouette_train, silhouette_test
+        print('Returning fitted pipe and best estimator')
+        return results, best_estimator
     else:
-        try:
-            
-            # Calculate silhouette score for test data
-            silhouette_test = silhouette_score(pca_test_df, best_estimator.fit_predict(pca_test_df))
+        if kmeans == True:
+            predictions_test = best_estimator.predict(pca_test_df)
             silhouette_train = silhouette_score(pca_train_df, best_estimator.labels_)
-            print(f'Validation Silhouette Score on test data: {silhouette_test}')
             print(f'Validation Silhouette Score on training data: {silhouette_train}')
+            # For test data
+            silhouette_test = silhouette_score(pca_test_df, best_estimator.predict(pca_test_df))
+            print(f'Validation Silhouette Score on test data: {silhouette_test}')
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f'Time taken: {elapsed_time / 60:.2f} minutes')
             print('Returning fitted pipe, best estimator, silohoutte score on training and testing')
             return results, best_estimator, silhouette_train, silhouette_test
-        except ValueError as e:
-            print("Only one cluster for my test data set. HDBSCAN does not work well for this data set")
-            end_time = time.time()
-            elapsed_time = end_time - start_time
-            print(f'Time taken: {elapsed_time / 60:.2f} minutes')
-            print('Returning fitted pipe and best estimator')
-            return results, best_estimator
+        else:
+            print('Calculating silhoute test and train metric')
+            # Calculate silhouette score for test data
+            if len(np.unique(best_estimator.fit_predict(pca_test_df))) == 1:
+                print('Estimator sends all test data points to the same data label. Cannot get sillhoute test score')
+                print('Returning results best estimator and silhouette_train score')
+                silhouette_train = silhouette_score(pca_train_df, best_estimator.fit_predict(pca_test_df))
+                return results, best_estimator, silhouette_train
+                
+            else:
+                silhouette_test = silhouette_score(pca_test_df, best_estimator.labels_)
+                silhouette_train = silhouette_score(pca_train_df, best_estimator.labels_)
+                print(f'Validation Silhouette Score on test data: {silhouette_test}')
+                print(f'Validation Silhouette Score on training data: {silhouette_train}')
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+                print(f'Time taken: {elapsed_time / 60:.2f} minutes')
+                print('Returning fitted pipe, best estimator, silohoutte score on training and testing')
+                return results, best_estimator, silhouette_train, silhouette_test
     
    
    ## ENd Source Chat GPT
