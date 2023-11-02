@@ -586,8 +586,8 @@ def calculate_silhouette(pca_train_df, pca_test_df, pipe, kmeans = False):
             # Calculate silhouette score for test data
             silhouette_test = silhouette_score(pca_test_df, best_estimator.fit_predict(pca_test_df))
             silhouette_train = silhouette_score(pca_train_df, best_estimator.labels_)
-            print(f'Silhouette Score on test data: {silhouette_test}')
-            print(f'Silhouette Score on training data: {silhouette_train}')
+            print(f'Validation Silhouette Score on test data: {silhouette_test}')
+            print(f'Validation Silhouette Score on training data: {silhouette_train}')
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f'Time taken: {elapsed_time / 60:.2f} minutes')
