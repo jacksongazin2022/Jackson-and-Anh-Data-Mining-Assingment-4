@@ -48,6 +48,8 @@ import pandas as pd
 import numpy as np
 from scipy.sparse import coo_matrix
 
+## Source: Chat GPT
+
 def load_data(data_path, row_info_path, column_info_path, transpose=False):
     # Load non_zero parquet data
     table = read_table(data_path)
@@ -332,7 +334,7 @@ class Optimize_and_Compare_Hdbscan(BaseEstimator, TransformerMixin):
                 print(f"Using {self.choice} as there is no significant improvement using a threshold of alpha = .05.")
         else:
             print("Grid Search Estimator Silhouette Score:", grid_search_silhouette_score)
-            print("Default KMeans Silhouette Score:", self.default_estimator_scores['silhouette_score'])
+            print("Default HDBSCAN Silhouette Score:", self.default_estimator_scores['silhouette_score'])
             print("Default Parameter has a higher Silhouette Score.")
             print("Using Default Parameter as it performs better based on Silhouette Score.")
 
@@ -602,4 +604,4 @@ def calculate_silhouette(pca_train_df, pca_test_df, pipe, kmeans = False):
             return results, best_estimator
     
    
-   
+   ## ENd Source Chat GPT
