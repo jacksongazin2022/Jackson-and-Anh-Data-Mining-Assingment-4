@@ -21,6 +21,7 @@ from sklearn.metrics import silhouette_score, adjusted_rand_score
 from sklearn.model_selection import GridSearchCV
 from yellowbrick.cluster import KElbowVisualizer, SilhouetteVisualizer
 from sklearn.cluster import HDBSCAN
+from sklearn.cluster import Birch
 from scipy import stats
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.model_selection import train_test_split
@@ -41,12 +42,42 @@ import pandas as pd
 import time
 from sklearn.metrics import silhouette_score
 
-
 # You can also define custom functions, classes, and other code in this module.
 
 import pandas as pd
 import numpy as np
 from scipy.sparse import coo_matrix
+
+# https://hdbscan.readthedocs.io/en/latest/performance_and_scalability.html
+def benchmark_algorithm(df, dataset_sizes, cluster_function, function_args, function_kwds,
+                        max_time=45, sample_size=1):
+
+    # Initialize the result with NaNs so that any unfilled entries
+    # will be considered NULL when we convert to a pandas dataframe at the end
+    result = np.nan * np.ones((len(dataset_sizes), sample_size))
+    for index, size in enumerate(dataset_sizes):
+        for s in range(sample_size):
+            # Use sklearns make_blobs to generate a random dataset with specified size
+            # dimension and number of clusters
+            data = df.iloc[0:size]
+
+            # Start the clustering with a timer
+            start_time = time.time()
+            cluster_function(data, *function_args, **function_kwds)
+            time_taken = time.time() - start_time
+
+            # If we are taking more than max_time then abort -- we don't
+            # want to spend excessive time on slow algorithms
+            if time_taken > max_time:
+                result[index, s] = time_taken
+                return pd.DataFrame(np.vstack([dataset_sizes.repeat(sample_size),
+                                               result.flatten()]).T, columns=['x','y'])
+            else:
+                result[index, s] = time_taken
+
+    # Return the result as a dataframe for easier handling with seaborn afterwards
+    return pd.DataFrame(np.vstack([dataset_sizes.repeat(sample_size),
+                                   result.flatten()]).T, columns=['x','y'])
 
 ## Source: Chat GPT
 
