@@ -48,6 +48,15 @@ import pandas as pd
 import numpy as np
 from scipy.sparse import coo_matrix
 
+import rpy2.robjects.numpy2ri
+from rpy2.robjects.packages import importr
+rpy2.robjects.numpy2ri.activate()
+stats = importr('stats')
+
+def fisher_test(m, var_name):
+    res = stats.fisher_test(m)
+    print('p-value for', var_name, ': {}'.format(res[0][0]))
+
 # https://hdbscan.readthedocs.io/en/latest/performance_and_scalability.html
 def benchmark_algorithm(df, dataset_sizes, cluster_function, function_args, function_kwds,
                         max_time=45, sample_size=1):
