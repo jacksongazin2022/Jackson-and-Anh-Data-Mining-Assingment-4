@@ -595,6 +595,9 @@ def calculate_silhouette(pca_train_df, pca_test_df, pipe, kmeans = False):
             return results, best_estimator, silhouette_train, silhouette_test
         except ValueError as e:
             print("Only one cluster for my test data set. HDBSCAN does not work well for this data set")
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print(f'Time taken: {elapsed_time / 60:.2f} minutes')
             print('Returning fitted pipe and best estimator')
             return results, best_estimator
     
