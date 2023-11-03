@@ -57,6 +57,39 @@ def fisher_test(m, var_name):
     res = stats.fisher_test(m)
     print('p-value for', var_name, ': {}'.format(res[0][0]))
 
+def birch_cluster(df, test, output_path):
+    brc = Birch(n_clusters=3)
+    # fit train 
+    start_time = time.time()
+    brc.fit(df)
+    time_taken = time.time() - start_time
+    print('Train time taken: ', round(time_taken,2))
+    # score train
+    score = silhouette_score(df, brc.labels_)
+    print('Train silhouette score: ', round(score,2))
+    # fit test 
+    brc_test = Birch(n_clusters=3)
+    start_time = time.time()
+    brc_test.fit(test)
+    time_taken = time.time() - start_time
+    print('Predict time taken: ', round(time_taken,2))
+    # score test
+    score_test = silhouette_score(test, brc_test.labels_)
+    print('Test silhouette score: ', round(score_test,2))
+    # write to csv
+    df['cluster'] = brc.labels_
+    test['cluster'] = brc_test.labels_
+    pd.concat([df, test], axis=0).to_csv(output_path)
+
+def run_time_analysis(df, dataset_sizes):
+    k_means = KMeans(10)
+    k_means_data = benchmark_algorithm(df, dataset_sizes, k_means.fit, (), {})
+    hdbscan = HDBSCAN()
+    hdbscan_data = benchmark_algorithm(df, dataset_sizes, hdbscan.fit, (), {})
+    birch = Birch()
+    birch_data = benchmark_algorithm(df, dataset_sizes, birch.fit, (), {})
+    return k_means_data, hdbscan_data, birch_data
+
 # https://hdbscan.readthedocs.io/en/latest/performance_and_scalability.html
 def benchmark_algorithm(df, dataset_sizes, cluster_function, function_args, function_kwds,
                         max_time=45, sample_size=1):
@@ -320,7 +353,11 @@ class DataEDAPCA:
         print('Returning updated dataframe, metadata of rows we removed, and PC of rows we removed')
         return self.updated_df, removed_metadata, self.outlier_df_cleaned
 
-
+def silhouette_scorer(estimator, X):  # Define it as an instance method
+    labels = estimator.fit_predict(X)
+    if len(set(labels)) == 1:
+        return 0  # Silhouette score is undefined for a single cluster
+    return silhouette_score(X, labels)
 
 class Optimize_and_Compare_Hdbscan(BaseEstimator, TransformerMixin):
     def __init__(self, hdbscan_params, alpha=0.05, random_state=42):
@@ -452,12 +489,14 @@ class OptimizeAndCompareKMeans(BaseEstimator, TransformerMixin):
         else:
             filename = filename + ".csv"
         dataframe.to_csv(filename)
+
 def save_to_csv(dataframe, filename, trans = False):
         if trans:
             filename = filename + "_trans.csv"  # Add "_trans" to the filename if data is transposed
         else:
             filename = filename + ".csv"
         dataframe.to_csv(filename)
+
 def create_labels_and_scoring_df(estimator, output_file_location, pca_train_df, pca_test_df, trans = False):
     # Extract cluster labels for training and test data
     train_cluster_labels = estimator.labels_
