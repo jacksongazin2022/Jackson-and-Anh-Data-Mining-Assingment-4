@@ -57,8 +57,8 @@ def fisher_test(m, var_name):
     res = stats.fisher_test(m)
     print('p-value for', var_name, ': {}'.format(res[0][0]))
 
-def birch_cluster(df, test, output_path):
-    brc = Birch(n_clusters=3)
+def birch_cluster(df, test, n, output_path):
+    brc = Birch(n_clusters=n)
     # fit train 
     start_time = time.time()
     brc.fit(df)
